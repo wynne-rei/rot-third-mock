@@ -148,6 +148,30 @@
     background: radial-gradient(ellipse, rgba(0,0,0,0.6) 0%, transparent 70%);
     z-index: -1;
   }
+  /* 俯瞰モードの注記 */
+  .watch-iso-note {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0,0,0,0.7);
+    color: #ffe060;
+    padding: 10px 20px;
+    border-radius: 24px;
+    font-size: 14px;
+    font-weight: bold;
+    z-index: 7;
+    white-space: nowrap;
+    pointer-events: none;
+    border: 2px dashed #ffe060;
+    box-shadow: 0 0 20px rgba(255,224,96,0.4);
+    backdrop-filter: blur(2px);
+    animation: note-pulse 2s ease-in-out infinite;
+  }
+  @keyframes note-pulse {
+    0%, 100% { opacity: 0.85; }
+    50%      { opacity: 1; }
+  }
   /* 雪原（クオータービュー床） */
   .watch-floor {
     position: absolute;
@@ -810,6 +834,7 @@
         <div class="watch-iso-obj watch-iso-mid-right" id="iso-mid-right">⚔</div>
         <div class="watch-iso-companion" id="iso-companion">🐕</div>
         <div class="watch-iso-hero" id="iso-hero">🧝</div>
+        <div class="watch-iso-note">※実際は俯瞰カメラです</div>
       </div>
     </div>
 
