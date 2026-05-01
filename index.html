@@ -1,0 +1,1427 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>RAID OF TITAN - THIRD ダイバーアプリ モック</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  /* スマホ枠（375x812）をPCで中央表示。ビューポートが小さい時は縮小 */
+  body {
+    background: #0a0e1a;
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', sans-serif;
+    overflow: auto;
+    padding: 8px;
+    box-sizing: border-box;
+  }
+  .phone-frame {
+    width: 375px;
+    height: 812px;
+    max-height: calc(100vh - 16px);
+    background: #1a1f2e;
+    border-radius: 40px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    overflow: hidden;
+    position: relative;
+    border: 8px solid #000;
+    flex-shrink: 0;
+  }
+  .screen {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    display: none;
+    flex-direction: column;
+    color: #fff;
+  }
+  .screen.active { display: flex; }
+  .screen-body { flex: 1 1 0; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  .screen-body::-webkit-scrollbar { display: none; }
+
+  /* スクロールバー隠し */
+  body { -ms-overflow-style: none; scrollbar-width: none; }
+  body::-webkit-scrollbar { display: none; }
+
+  /* 視聴中の背景：LIVE時=実機スクショ／OFFLINE時=俯瞰ジオラマ */
+  .watch-bg {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+  }
+  /* LIVE用：実機スクショ */
+  .watch-bg-live {
+    position: absolute;
+    inset: 0;
+    background-image: url('assets/watch-bg.png');
+    background-size: cover;
+    background-position: center;
+  }
+  .watch-bg-live::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(to bottom right, transparent 80%, rgba(10,14,26,0.95) 90%),
+      linear-gradient(to top left, rgba(10,14,26,0.4) 0%, transparent 30%);
+    pointer-events: none;
+  }
+
+  /* OFFLINE用：俯瞰ジオラマ（ホーム画面アバターを画面いっぱいに拡大） */
+  .watch-bg-offline {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    background: linear-gradient(to bottom,
+      #0a1530 0%, #2a4070 25%, #6090b0 42%, #aaccdd 48%, transparent 50%);
+    animation: iso-sway 18s ease-in-out infinite;
+    transform-origin: center 60%;
+  }
+  @keyframes iso-sway {
+    0%, 100% { transform: translateX(0) rotateZ(0deg); }
+    25%      { transform: translateX(-8px) rotateZ(-0.6deg); }
+    75%      { transform: translateX(8px)  rotateZ(0.6deg); }
+  }
+  .watch-iso-floor {
+    position: absolute;
+    bottom: -10%;
+    left: -30%;
+    right: -30%;
+    height: 65%;
+    background:
+      repeating-linear-gradient(90deg, rgba(255,255,255,0.16) 0 1px, transparent 1px 32px),
+      repeating-linear-gradient(0deg,  rgba(160,180,210,0.22) 0 1px, transparent 1px 32px),
+      linear-gradient(180deg, #d8e8f4 0%, #4a6a90 100%);
+    transform: perspective(300px) rotateX(58deg);
+    transform-origin: top center;
+    box-shadow: inset 0 -40px 60px rgba(0,30,60,0.4);
+  }
+  .watch-iso-moon {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 78% 18%, rgba(220,235,255,0.4) 0%, transparent 30%);
+    pointer-events: none;
+  }
+  /* オブジェクト配置（拡大版） */
+  .watch-iso-obj {
+    position: absolute;
+    transform: translateX(-50%);
+  }
+  .watch-iso-back        { top: 18%; left: 50%; font-size: 80px;
+    filter: drop-shadow(4px 8px 6px rgba(0,0,0,0.7)); z-index: 1; }
+  .watch-iso-back-left   { top: 28%; left: 18%; font-size: 48px;
+    filter: drop-shadow(3px 5px 4px rgba(0,0,0,0.6)); z-index: 1; }
+  .watch-iso-back-right  { top: 28%; left: 82%; font-size: 48px;
+    filter: drop-shadow(3px 5px 4px rgba(0,0,0,0.6)); z-index: 1; }
+  .watch-iso-mid-left    { top: 50%; left: 18%; font-size: 56px;
+    filter: drop-shadow(4px 6px 5px rgba(0,0,0,0.7)); z-index: 3; }
+  .watch-iso-mid-right   { top: 50%; left: 82%; font-size: 56px;
+    filter: drop-shadow(4px 6px 5px rgba(0,0,0,0.7)); z-index: 3; }
+  .watch-iso-companion {
+    position: absolute;
+    top: 60%;
+    left: 35%;
+    transform: translateX(-50%);
+    font-size: 48px;
+    z-index: 4;
+    filter: drop-shadow(4px 6px 4px rgba(0,0,0,0.8));
+  }
+  .watch-iso-hero {
+    position: absolute;
+    top: 62%;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 70px;
+    z-index: 5;
+    filter: drop-shadow(5px 8px 5px rgba(0,0,0,0.85));
+  }
+  .watch-iso-hero::after, .watch-iso-companion::after {
+    content: '';
+    position: absolute;
+    bottom: -10px; left: 50%;
+    transform: translateX(-50%);
+    width: 50px; height: 12px;
+    background: radial-gradient(ellipse, rgba(0,0,0,0.6) 0%, transparent 70%);
+    z-index: -1;
+  }
+  /* 雪原（クオータービュー床） */
+  .watch-floor {
+    position: absolute;
+    bottom: -10%;
+    left: -30%;
+    right: -30%;
+    height: 60%;
+    background:
+      repeating-linear-gradient(90deg,
+        rgba(255,255,255,0.15) 0 1px,
+        transparent 1px 28px),
+      repeating-linear-gradient(0deg,
+        rgba(160,180,210,0.25) 0 1px,
+        transparent 1px 28px),
+      linear-gradient(180deg, #d8e8f4 0%, #4a6a90 100%);
+    transform: perspective(280px) rotateX(62deg);
+    transform-origin: top center;
+    box-shadow: inset 0 -40px 60px rgba(0,30,60,0.4);
+  }
+  /* 月光オーバーレイ */
+  .watch-bg::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(circle at 75% 15%, rgba(220,235,255,0.35) 0%, transparent 35%),
+      radial-gradient(circle at 50% 35%, rgba(255,200,150,0.15) 0%, transparent 50%);
+    pointer-events: none;
+  }
+
+  /* 巨人（奥・超巨大） */
+  .watch-titan {
+    position: absolute;
+    top: 12%;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 200px;
+    line-height: 1;
+    filter: drop-shadow(8px 16px 12px rgba(0,0,0,0.7));
+    z-index: 2;
+    animation: titan-loom 6s ease-in-out infinite;
+  }
+  @keyframes titan-loom {
+    0%, 100% { transform: translateX(-50%) translateY(0) scale(1); }
+    50%      { transform: translateX(-50%) translateY(-6px) scale(1.02); }
+  }
+
+  /* 奥の小道具（中サイズ） */
+  .watch-prop-tower-l { position: absolute; top: 38%; left: 12%; font-size: 32px;
+    filter: drop-shadow(3px 5px 4px rgba(0,0,0,0.6)); z-index: 2; }
+  .watch-prop-tower-r { position: absolute; top: 38%; right: 12%; font-size: 30px;
+    filter: drop-shadow(3px 5px 4px rgba(0,0,0,0.6)); z-index: 2; }
+  .watch-prop-tree-l { position: absolute; top: 48%; left: 24%; font-size: 26px;
+    filter: drop-shadow(3px 4px 3px rgba(0,0,0,0.6)); z-index: 3; }
+  .watch-prop-tree-r { position: absolute; top: 48%; right: 24%; font-size: 26px;
+    filter: drop-shadow(3px 4px 3px rgba(0,0,0,0.6)); z-index: 3; }
+
+  /* 大砲（中段） */
+  .watch-cannon-l { position: absolute; bottom: 38%; left: 22%; font-size: 32px;
+    filter: drop-shadow(4px 5px 4px rgba(0,0,0,0.7)); z-index: 4; }
+  .watch-cannon-r { position: absolute; bottom: 38%; right: 22%; font-size: 32px;
+    filter: drop-shadow(4px 5px 4px rgba(0,0,0,0.7)); z-index: 4; }
+
+  /* 追従キャラ（プレイヤーの少し奥・横） */
+  .watch-companion {
+    position: absolute;
+    bottom: 22%;
+    left: 30%;
+    font-size: 42px;
+    z-index: 5;
+    filter: drop-shadow(4px 6px 4px rgba(0,0,0,0.8));
+  }
+  .watch-companion::after {
+    content: '';
+    position: absolute;
+    bottom: -6px; left: 50%;
+    transform: translateX(-50%);
+    width: 36px; height: 8px;
+    background: radial-gradient(ellipse, rgba(0,0,0,0.55) 0%, transparent 70%);
+    z-index: -1;
+  }
+
+  /* プレイヤー（手前中央・最大） */
+  .watch-player {
+    position: absolute;
+    bottom: 16%;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 80px;
+    z-index: 6;
+    filter: drop-shadow(6px 10px 6px rgba(0,0,0,0.9));
+  }
+  .watch-player::after {
+    content: '';
+    position: absolute;
+    bottom: -8px; left: 50%;
+    transform: translateX(-50%);
+    width: 60px; height: 12px;
+    background: radial-gradient(ellipse, rgba(0,0,0,0.65) 0%, transparent 70%);
+    z-index: -1;
+  }
+
+  /* ────── アバターカード（クオータービュー＝アイソメ斜め視点） ────── */
+  .avatar-card {
+    background: linear-gradient(135deg, #2a3550 0%, #1a2238 100%);
+    border-radius: 12px;
+    overflow: hidden;
+    position: relative;
+    aspect-ratio: 1.0;
+    cursor: pointer;
+    transition: transform 0.2s;
+    border: 1px solid #3a4565;
+  }
+  .avatar-card:active { transform: scale(0.96); }
+
+  .avatar-card .scene {
+    height: 75%;
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(to bottom,
+      #1a2a4a 0%,
+      #4a6a8a 30%,
+      #8aaaca 45%,
+      transparent 50%);
+  }
+  .avatar-card.fire .scene {
+    background: linear-gradient(to bottom,
+      #2a1530 0%, #6a3050 25%, #c06040 42%, transparent 50%);
+  }
+  .avatar-card.ice .scene {
+    background: linear-gradient(to bottom,
+      #1a2a4a 0%, #4a7aaa 25%, #aaccee 42%, transparent 50%);
+  }
+  .avatar-card.earth .scene {
+    background: linear-gradient(to bottom,
+      #2a1a10 0%, #806030 25%, #c0a060 42%, transparent 50%);
+  }
+
+  /* ★クオータービューの肝：斜め見下ろしの床 */
+  .avatar-card .iso-floor {
+    position: absolute;
+    bottom: -10%;
+    left: -20%;
+    right: -20%;
+    height: 70%;
+    background:
+      /* 縦のグリッド線（パースで奥に消える） */
+      repeating-linear-gradient(90deg,
+        rgba(255,255,255,0.18) 0 1px,
+        transparent 1px 16px),
+      /* 横のグリッド線 */
+      repeating-linear-gradient(0deg,
+        rgba(255,255,255,0.15) 0 1px,
+        transparent 1px 16px),
+      /* 地面色 */
+      linear-gradient(180deg, #6a9050 0%, #3a5028 100%);
+    transform: perspective(160px) rotateX(58deg);
+    transform-origin: top center;
+    box-shadow: inset 0 -20px 30px rgba(0,0,0,0.4);
+  }
+  .avatar-card.fire .iso-floor {
+    background:
+      repeating-linear-gradient(90deg, rgba(255,255,255,0.15) 0 1px, transparent 1px 16px),
+      repeating-linear-gradient(0deg, rgba(255,255,255,0.12) 0 1px, transparent 1px 16px),
+      linear-gradient(180deg, #c08050 0%, #602010 100%);
+  }
+  .avatar-card.ice .iso-floor {
+    background:
+      repeating-linear-gradient(90deg, rgba(255,255,255,0.25) 0 1px, transparent 1px 16px),
+      repeating-linear-gradient(0deg, rgba(255,255,255,0.22) 0 1px, transparent 1px 16px),
+      linear-gradient(180deg, #c8e0f0 0%, #4070a0 100%);
+  }
+  .avatar-card.earth .iso-floor {
+    background:
+      repeating-linear-gradient(90deg, rgba(255,255,255,0.15) 0 1px, transparent 1px 16px),
+      repeating-linear-gradient(0deg, rgba(255,255,255,0.12) 0 1px, transparent 1px 16px),
+      linear-gradient(180deg, #b0905a 0%, #503020 100%);
+  }
+
+  /* オブジェクト配置：奥行きでサイズと位置と影を変える */
+  .avatar-card .iso-obj {
+    position: absolute;
+    transform: translateX(-50%);
+    z-index: 2;
+  }
+  /* 奥中央（建物：大） */
+  .avatar-card .o-back        { top: 24%; left: 50%; font-size: 26px; z-index: 1;
+    filter: drop-shadow(2px 4px 3px rgba(0,0,0,0.7)); }
+  /* 奥左 */
+  .avatar-card .o-back-left   { top: 32%; left: 22%; font-size: 16px; z-index: 1;
+    filter: drop-shadow(2px 3px 3px rgba(0,0,0,0.6)); opacity: 0.9; }
+  /* 奥右 */
+  .avatar-card .o-back-right  { top: 32%; left: 78%; font-size: 16px; z-index: 1;
+    filter: drop-shadow(2px 3px 3px rgba(0,0,0,0.6)); opacity: 0.9; }
+  /* 中段左 */
+  .avatar-card .o-mid-left    { top: 50%; left: 20%; font-size: 18px; z-index: 3;
+    filter: drop-shadow(3px 4px 3px rgba(0,0,0,0.7)); }
+  /* 中段右 */
+  .avatar-card .o-mid-right   { top: 50%; left: 80%; font-size: 18px; z-index: 3;
+    filter: drop-shadow(3px 4px 3px rgba(0,0,0,0.7)); }
+  /* 手前中央（キャラ：最大） */
+  .avatar-card .o-hero {
+    position: absolute;
+    bottom: 6%;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 36px;
+    z-index: 5;
+    filter: drop-shadow(3px 6px 4px rgba(0,0,0,0.9));
+  }
+  /* キャラの影 */
+  .avatar-card .o-hero::after {
+    content: '';
+    position: absolute;
+    bottom: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 30px;
+    height: 8px;
+    background: radial-gradient(ellipse, rgba(0,0,0,0.6) 0%, transparent 70%);
+    z-index: -1;
+  }
+
+  /* 太陽光オーバーレイ（右上から差す） */
+  .avatar-card .scene::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 75% 20%, rgba(255,230,160,0.3) 0%, transparent 45%);
+    pointer-events: none;
+    z-index: 4;
+  }
+
+  .avatar-card .info {
+    height: 25%;
+    padding: 5px 7px;
+    font-size: 10px;
+    line-height: 1.25;
+  }
+  .avatar-card .name { font-weight: bold; font-size: 12px; }
+  .avatar-card .live { color: #ff5060; font-weight: bold; }
+  .avatar-card .off { color: #888; }
+  .avatar-card .danger { color: #ff8030; font-weight: bold; }
+  /* LIVE時の脈動 */
+  .avatar-card.live-card {
+    box-shadow: 0 0 0 2px rgba(255,80,96,0.6);
+    animation: live-pulse 1.8s ease-in-out infinite;
+  }
+  @keyframes live-pulse {
+    0%, 100% { box-shadow: 0 0 0 2px rgba(255,80,96,0.4); }
+    50% { box-shadow: 0 0 0 4px rgba(255,80,96,0.8); }
+  }
+  .avatar-card.attacked-card {
+    box-shadow: 0 0 0 2px rgba(255,128,48,0.7);
+    animation: attacked-pulse 0.9s ease-in-out infinite;
+  }
+  @keyframes attacked-pulse {
+    0%, 100% { box-shadow: 0 0 0 2px rgba(255,128,48,0.5); }
+    50% { box-shadow: 0 0 0 5px rgba(255,128,48,1); }
+  }
+  /* LIVE時の脈動 */
+  .avatar-card.live-card {
+    box-shadow: 0 0 0 2px rgba(255,80,96,0.6);
+    animation: live-pulse 1.8s ease-in-out infinite;
+  }
+  @keyframes live-pulse {
+    0%, 100% { box-shadow: 0 0 0 2px rgba(255,80,96,0.4); }
+    50% { box-shadow: 0 0 0 4px rgba(255,80,96,0.8); }
+  }
+  .avatar-card.attacked-card {
+    box-shadow: 0 0 0 2px rgba(255,128,48,0.7);
+    animation: attacked-pulse 0.9s ease-in-out infinite;
+  }
+  @keyframes attacked-pulse {
+    0%, 100% { box-shadow: 0 0 0 2px rgba(255,128,48,0.5); }
+    50% { box-shadow: 0 0 0 5px rgba(255,128,48,1); }
+  }
+
+  /* カード（モック用） */
+  .card {
+    width: 70px;
+    height: 90px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #4a5d8e 0%, #2a3550 100%);
+    border: 2px solid #6a7daf;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.2s;
+    position: relative;
+    flex-shrink: 0;
+  }
+  .card:active { transform: translateY(-3px); }
+  .card.disabled { opacity: 0.4; filter: grayscale(0.5); cursor: not-allowed; }
+  .card.selected {
+    border-color: #ffe060;
+    box-shadow: 0 0 12px rgba(255,224,96,0.7);
+    transform: translateY(-4px);
+  }
+  .card .emoji { font-size: 32px; }
+  .card .name { font-size: 9px; font-weight: bold; }
+  .card .cost {
+    position: absolute;
+    top: -6px;
+    left: -6px;
+    width: 22px;
+    height: 22px;
+    background: #6080d0;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: bold;
+    border: 2px solid #fff;
+  }
+
+  /* エリクサー */
+  .elixir-bar {
+    display: flex;
+    gap: 2px;
+    padding: 6px 12px;
+    background: rgba(0,0,0,0.5);
+  }
+  .elixir-cell {
+    flex: 1;
+    height: 12px;
+    background: #2a3550;
+    border-radius: 3px;
+    border: 1px solid #4a5d8e;
+  }
+  .elixir-cell.filled {
+    background: linear-gradient(to bottom, #80c0ff 0%, #4080d0 100%);
+    box-shadow: 0 0 4px rgba(96,160,255,0.6);
+  }
+
+  /* 召喚アニメーション */
+  .summon-effect {
+    position: absolute;
+    font-size: 50px;
+    z-index: 6;
+    animation: summon 2.5s ease-out forwards;
+    filter: drop-shadow(0 5px 10px rgba(0,0,0,0.7));
+    pointer-events: none;
+  }
+  @keyframes summon {
+    0% { transform: translateY(-200px) scale(0.5); opacity: 0; }
+    20% { transform: translateY(0) scale(1.3); opacity: 1; }
+    30% { transform: translateY(0) scale(1); opacity: 1; }
+    100% { transform: translateY(0) scale(1); opacity: 1; }
+  }
+
+  /* 配置ゴースト（カード選択中、配置先をプレビュー） */
+  .summon-ghost {
+    position: absolute;
+    z-index: 5;
+    pointer-events: none;
+    transform: translate(-50%, -85%);
+    text-align: center;
+    animation: ghost-pulse 1s ease-in-out infinite;
+  }
+  .summon-ghost .ghost-emoji {
+    font-size: 50px;
+    opacity: 0.85;
+    filter:
+      drop-shadow(0 0 8px #ffe060)
+      drop-shadow(0 0 14px rgba(255,224,96,0.6))
+      brightness(1.3);
+  }
+  .summon-ghost .ghost-ring {
+    width: 70px;
+    height: 24px;
+    margin: 0 auto;
+    border-radius: 50%;
+    border: 2px dashed #ffe060;
+    box-shadow:
+      0 0 10px #ffe060,
+      inset 0 0 10px rgba(255,224,96,0.4);
+    animation: ring-spin 2s linear infinite;
+  }
+  @keyframes ghost-pulse {
+    0%, 100% { transform: translate(-50%, -85%) translateY(0); }
+    50%      { transform: translate(-50%, -85%) translateY(-4px); }
+  }
+  @keyframes ring-spin {
+    0%   { transform: rotate(0deg) scaleX(1); }
+    50%  { transform: rotate(180deg) scaleX(1.1); }
+    100% { transform: rotate(360deg) scaleX(1); }
+  }
+
+  /* タブバー */
+  .tab-bar {
+    display: flex;
+    background: #0a0e1a;
+    border-top: 1px solid #2a3550;
+    padding-bottom: 8px;
+    flex-shrink: 0;
+  }
+  .tab-bar button {
+    flex: 1;
+    padding: 8px 0;
+    background: transparent;
+    border: 0;
+    color: #6a7595;
+    font-size: 11px;
+    cursor: pointer;
+  }
+  .tab-bar button.active { color: #ffe060; }
+  .tab-bar button .icon { display: block; font-size: 22px; margin-bottom: 2px; }
+
+  /* ターゲット指定モード */
+  .target-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 4;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: auto;
+    cursor: crosshair;
+  }
+  .target-prompt {
+    position: absolute;
+    top: 30%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(255,224,96,0.95);
+    color: #000;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: bold;
+    white-space: nowrap;
+  }
+  .target-cancel {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: rgba(0,0,0,0.7);
+    color: #fff;
+    border: 0;
+    padding: 6px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+
+  /* 宝箱モーダル */
+  .modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    border-radius: 32px;
+  }
+  .modal.active { display: flex; }
+  .modal-content {
+    background: #1a1f2e;
+    padding: 30px 24px;
+    border-radius: 16px;
+    width: calc(100% - 60px);
+    max-width: 320px;
+    text-align: center;
+    border: 2px solid #ffe060;
+    color: #fff;
+  }
+  .treasure-box {
+    font-size: 100px;
+    cursor: pointer;
+    animation: float 2s ease-in-out infinite;
+    display: inline-block;
+  }
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+  }
+
+  /* 国選択画面のKVカード */
+  .faction-card {
+    position: relative;
+    border-radius: 16px;
+    overflow: hidden;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: all 0.2s;
+    aspect-ratio: 2/1;
+  }
+  .faction-card:active { transform: scale(0.98); }
+  .faction-card.selected {
+    border-color: #ffe060;
+    box-shadow: 0 0 20px rgba(255,224,96,0.6);
+  }
+  .faction-card .fc-bg {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+  }
+  .faction-card.fire .fc-bg {
+    background:
+      radial-gradient(ellipse at 70% 30%, rgba(255,200,100,0.6) 0%, transparent 50%),
+      linear-gradient(135deg, #4a1010 0%, #c04020 50%, #401010 100%);
+  }
+  .faction-card.ice .fc-bg {
+    background:
+      radial-gradient(ellipse at 70% 30%, rgba(220,240,255,0.5) 0%, transparent 50%),
+      linear-gradient(135deg, #102040 0%, #4080c0 50%, #102040 100%);
+  }
+  .faction-card.earth .fc-bg {
+    background:
+      radial-gradient(ellipse at 70% 30%, rgba(255,220,150,0.4) 0%, transparent 50%),
+      linear-gradient(135deg, #2a1810 0%, #806030 50%, #2a1810 100%);
+  }
+  /* 国の象徴絵文字（大）と地形 */
+  .faction-card .fc-emoji {
+    position: absolute;
+    right: 12%;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 60px;
+    filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.7));
+  }
+  .faction-card .fc-info {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #fff;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+  }
+  .faction-card .fc-name {
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 2px;
+  }
+  .faction-card .fc-tag {
+    font-size: 11px;
+    opacity: 0.9;
+  }
+
+  /* タブ切替（編成/視聴中で使う） */
+  .pill-tabs { display: flex; gap: 6px; padding: 0 16px 8px; }
+  .pill-tabs button {
+    flex: 1;
+    padding: 8px;
+    background: #2a3550;
+    border: 0;
+    color: #aaa;
+    border-radius: 16px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .pill-tabs button.active { background: #ffe060; color: #000; font-weight: bold; }
+</style>
+</head>
+<body>
+
+<div class="phone-frame">
+
+  <!-- ▼ 所属国選択画面（初回ログイン）▼ -->
+  <div id="screen-faction-select" class="screen bg-slate-900">
+    <div class="px-4 pt-6 pb-3 text-center border-b border-slate-700">
+      <div class="text-yellow-300 text-xs mb-1">✨ 初回ログイン</div>
+      <div class="text-lg font-bold">所属国を選ぶ</div>
+      <div class="text-[11px] text-slate-400 mt-1">あなたが背負う国を選びましょう。<br>後から変更はできません。</div>
+    </div>
+    <div class="screen-body p-4 space-y-3">
+      <div class="faction-card fire" onclick="selectFaction('fire', this)">
+        <div class="fc-bg"></div>
+        <div class="fc-info">
+          <div class="fc-name">🔥 火の国</div>
+          <div class="fc-tag">インフェリア</div>
+          <div class="fc-tag">灼熱の戦士たち</div>
+        </div>
+        <div class="fc-emoji">🌋</div>
+      </div>
+      <div class="faction-card ice" onclick="selectFaction('ice', this)">
+        <div class="fc-bg"></div>
+        <div class="fc-info">
+          <div class="fc-name">🧊 氷の国</div>
+          <div class="fc-tag">フロスティア</div>
+          <div class="fc-tag">氷雪の守護者たち</div>
+        </div>
+        <div class="fc-emoji">🏔</div>
+      </div>
+      <div class="faction-card earth" onclick="selectFaction('earth', this)">
+        <div class="fc-bg"></div>
+        <div class="fc-info">
+          <div class="fc-name">⛰ 土の国</div>
+          <div class="fc-tag">ガイアス</div>
+          <div class="fc-tag">大地の覇者たち</div>
+        </div>
+        <div class="fc-emoji">🏛</div>
+      </div>
+    </div>
+    <button id="faction-confirm" disabled
+      onclick="confirmFaction()"
+      class="mx-4 mb-4 py-3 bg-yellow-400 text-black rounded-xl font-bold disabled:opacity-30 disabled:cursor-not-allowed flex-shrink-0">
+      この国で戦う
+    </button>
+  </div>
+
+  <!-- ▼ ホーム画面 ▼ -->
+  <div id="screen-home" class="screen bg-slate-900">
+    <!-- ヘッダー -->
+    <div class="px-4 py-3 flex items-center justify-between border-b border-slate-700">
+      <div class="flex items-center gap-2">
+        <div class="w-9 h-9 rounded-full bg-gradient-to-br from-orange-400 to-red-600 flex items-center justify-center text-lg">👤</div>
+        <div>
+          <div class="text-xs">レイさん</div>
+          <div class="text-[10px] text-orange-400" id="home-faction-label">🔥 火の国 / Lv.12</div>
+        </div>
+      </div>
+      <div class="text-right">
+        <div class="text-yellow-300 text-sm font-bold">🎯 700 THP</div>
+        <div class="text-[10px] text-slate-400">タップで購入</div>
+      </div>
+    </div>
+
+    <!-- 自国民アバターグリッド -->
+    <div class="screen-body p-3">
+      <div class="text-sm font-bold mb-2 text-orange-300">🔥 火の国の仲間</div>
+      <div class="grid grid-cols-2 gap-2" id="ally-grid"></div>
+      <div class="text-center text-[11px] text-slate-400 mt-2">↓ もっと見る ↓</div>
+    </div>
+
+    <!-- 遠征CTA（フッタータブの真上に固定） -->
+    <button onclick="show('expedition')" class="mx-3 mb-2 py-3 bg-gradient-to-r from-purple-700 to-pink-700 rounded-xl font-bold flex items-center justify-center gap-2 flex-shrink-0">
+      🚀 遠征セット
+      <span class="text-xs opacity-70">(進行中 1/1)</span>
+    </button>
+
+    <!-- タブバー -->
+    <div class="tab-bar">
+      <button class="active" onclick="show('home')"><span class="icon">🏠</span>ホーム</button>
+      <button onclick="show('deck')"><span class="icon">⚔</span>編成</button>
+      <button onclick="show('shop')"><span class="icon">🛒</span>ショップ</button>
+      <button onclick="show('settings')"><span class="icon">⚙</span>設定</button>
+    </div>
+  </div>
+
+  <!-- ▼ 配信視聴中画面 ▼ -->
+  <div id="screen-watch" class="screen bg-slate-800 relative">
+    <!-- 背景：LIVE時=実機スクショ／OFFLINE時=俯瞰ジオラマ -->
+    <div class="watch-bg" id="watch-bg">
+      <div class="watch-bg-live" id="watch-bg-live"></div>
+      <div class="watch-bg-offline" id="watch-bg-offline" style="display:none;">
+        <div class="watch-iso-moon"></div>
+        <div class="watch-iso-floor"></div>
+        <div class="watch-iso-obj watch-iso-back" id="iso-back">🏰</div>
+        <div class="watch-iso-obj watch-iso-back-left" id="iso-back-left">🌲</div>
+        <div class="watch-iso-obj watch-iso-back-right" id="iso-back-right">🌲</div>
+        <div class="watch-iso-obj watch-iso-mid-left" id="iso-mid-left">⚔</div>
+        <div class="watch-iso-obj watch-iso-mid-right" id="iso-mid-right">⚔</div>
+        <div class="watch-iso-companion" id="iso-companion">🐕</div>
+        <div class="watch-iso-hero" id="iso-hero">🧝</div>
+      </div>
+    </div>
+
+    <!-- ヘッダー -->
+    <div class="relative z-10 px-3 py-2 bg-black/50 flex items-center gap-2">
+      <button onclick="show('home')" class="text-xl">✕</button>
+      <div class="flex-1">
+        <div class="text-xs font-bold flex items-center gap-2">
+          <span id="watch-streamer">レイ (火の国) Day3</span>
+          <span id="watch-mode" class="text-[9px] px-1.5 py-0.5 rounded bg-red-600/80">📡 LIVE</span>
+        </div>
+        <div class="flex gap-2 mt-1 text-[10px]">
+          <div>HP <span class="text-orange-400">🟧 70/100</span></div>
+          <div>🐕 ポチ <span class="text-red-400">🟥 25/50</span></div>
+        </div>
+      </div>
+      <div class="text-xs text-slate-300">👀 100</div>
+    </div>
+
+    <!-- スペーサー（背景を見せる） -->
+    <div class="flex-1 relative z-10 pointer-events-none"></div>
+
+    <!-- エリクサー -->
+    <div class="relative z-10 elixir-bar">
+      <div class="text-[10px] text-blue-300 mr-2 self-center font-bold">⚡ <span id="elixir-count">4</span>/10</div>
+      <div class="flex-1 elixir-bar p-0 gap-1" id="elixir-cells"></div>
+    </div>
+
+    <!-- 手札 -->
+    <div class="relative z-10 bg-black/70 p-3 flex justify-around items-center" id="hand"></div>
+
+    <!-- ターゲット指定モード -->
+    <div id="target-mode" class="target-overlay" style="display:none;">
+      <div class="target-prompt" id="target-prompt">タップでターゲット指定</div>
+      <button class="target-cancel" onclick="cancelTarget()">キャンセル</button>
+    </div>
+  </div>
+
+  <!-- ▼ 編成画面 ▼ -->
+  <div id="screen-deck" class="screen bg-slate-900">
+    <!-- ヘッダー -->
+    <div class="px-4 py-3 flex items-center gap-3 border-b border-slate-700">
+      <button onclick="show('home')">←</button>
+      <div class="font-bold">編成</div>
+    </div>
+
+    <div class="screen-body p-4">
+      <!-- デッキ -->
+      <div class="text-sm font-bold mb-2">デッキ (4/4)</div>
+      <div class="flex gap-2 justify-around bg-slate-800 p-3 rounded-xl mb-3" id="deck-cards"></div>
+      <div class="text-xs text-slate-400 mb-4 text-center">平均コスト: 4.5</div>
+
+      <!-- 所持カード -->
+      <div class="text-sm font-bold mb-2">所持カード一覧</div>
+      <div class="grid grid-cols-3 gap-3" id="owned-cards"></div>
+    </div>
+
+    <!-- タブバー -->
+    <div class="tab-bar">
+      <button onclick="show('home')"><span class="icon">🏠</span>ホーム</button>
+      <button class="active"><span class="icon">⚔</span>編成</button>
+      <button onclick="show('shop')"><span class="icon">🛒</span>ショップ</button>
+      <button onclick="show('settings')"><span class="icon">⚙</span>設定</button>
+    </div>
+  </div>
+
+  <!-- ▼ 遠征画面 ▼ -->
+  <div id="screen-expedition" class="screen bg-slate-900">
+    <div class="px-4 py-3 flex items-center gap-3 border-b border-slate-700">
+      <button onclick="show('home')">←</button>
+      <div class="font-bold">遠征</div>
+    </div>
+
+    <div class="screen-body p-3">
+      <!-- 進行中 -->
+      <div class="bg-slate-800 rounded-xl p-3 mb-4 border border-purple-700">
+        <div class="text-xs text-purple-300 mb-1">🟢 進行中の遠征 1/1</div>
+        <div class="flex justify-between items-center">
+          <div>
+            <div class="font-bold text-sm">⚔ ノブナガ宅 (氷の国)</div>
+            <div class="text-[10px] text-slate-400">残り 02:14:33</div>
+          </div>
+          <div class="text-xs">47%</div>
+        </div>
+        <div class="mt-2 bg-slate-700 h-2 rounded overflow-hidden">
+          <div class="h-full bg-purple-500" style="width:47%"></div>
+        </div>
+      </div>
+
+      <div class="text-sm font-bold mb-2">🎯 攻撃目標を選ぶ</div>
+      <div class="pill-tabs" style="padding:0 0 8px;">
+        <button class="active" data-faction="ice" onclick="filterFaction(this,'ice')">🧊 氷の国</button>
+        <button data-faction="earth" onclick="filterFaction(this,'earth')">⛰ 土の国</button>
+      </div>
+      <div class="grid grid-cols-2 gap-3" id="enemy-grid"></div>
+    </div>
+  </div>
+
+  <!-- ▼ ショップ画面 ▼ -->
+  <div id="screen-shop" class="screen bg-slate-900">
+    <div class="px-4 py-3 flex items-center justify-between border-b border-slate-700">
+      <div class="flex items-center gap-3">
+        <button onclick="show('home')">←</button>
+        <div class="font-bold">ショップ</div>
+      </div>
+      <div class="text-yellow-300 text-sm font-bold">🎯 700 THP</div>
+    </div>
+
+    <div class="pill-tabs pt-3">
+      <button class="active" onclick="shopTab(this,'pack')">買い切り</button>
+      <button onclick="shopTab(this,'box')">宝箱</button>
+    </div>
+
+    <div class="screen-body px-4 pb-4">
+      <!-- 買い切りパック -->
+      <div id="shop-pack">
+        <!-- ブーストパック -->
+        <div class="bg-gradient-to-br from-pink-800 to-orange-700 rounded-xl p-4 mb-3 border border-orange-400">
+          <div class="text-xs text-yellow-200 mb-1">⏰ ブーストパック (残り 2日 12:34)</div>
+          <div class="font-bold mb-1">全カード x5ずつ</div>
+          <div class="text-xs opacity-80 mb-3">通常2,000THP→ <span class="text-yellow-300 font-bold text-base">1,200THP</span></div>
+          <button class="w-full py-2 bg-yellow-400 text-black font-bold rounded-lg">購入する</button>
+        </div>
+        <!-- デイリースペシャル -->
+        <div class="bg-slate-800 rounded-xl p-4 mb-3">
+          <div class="text-xs text-yellow-200 mb-1">🎁 デイリースペシャル</div>
+          <div class="font-bold mb-1">修理マンパック</div>
+          <div class="text-xs opacity-80 mb-3">修理マンカード x10 / 通常500THP→ <span class="text-yellow-300 font-bold">300THP</span></div>
+          <button class="w-full py-2 bg-yellow-400 text-black font-bold rounded-lg">購入する</button>
+        </div>
+      </div>
+      <!-- 宝箱 -->
+      <div id="shop-box" style="display:none;">
+        <div class="bg-slate-800 rounded-xl p-4 mb-3">
+          <div class="text-2xl mb-2 text-center">📦</div>
+          <div class="font-bold mb-1 text-center">通常宝箱</div>
+          <div class="text-xs opacity-80 mb-3 text-center">中身ランダム</div>
+          <button class="w-full py-2 bg-yellow-400 text-black font-bold rounded-lg" onclick="openTreasure()">100 THP で購入</button>
+        </div>
+        <div class="bg-slate-800 rounded-xl p-4 mb-3">
+          <div class="text-2xl mb-2 text-center">📦📦📦</div>
+          <div class="font-bold mb-1 text-center">通常宝箱 x10セット</div>
+          <div class="text-xs opacity-80 mb-3 text-center">10%お得</div>
+          <button class="w-full py-2 bg-yellow-400 text-black font-bold rounded-lg" onclick="openTreasure()">900 THP で購入</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-bar">
+      <button onclick="show('home')"><span class="icon">🏠</span>ホーム</button>
+      <button onclick="show('deck')"><span class="icon">⚔</span>編成</button>
+      <button class="active"><span class="icon">🛒</span>ショップ</button>
+      <button onclick="show('settings')"><span class="icon">⚙</span>設定</button>
+    </div>
+  </div>
+
+  <!-- ▼ 設定画面 ▼ -->
+  <div id="screen-settings" class="screen bg-slate-900">
+    <div class="px-4 py-3 flex items-center gap-3 border-b border-slate-700">
+      <button onclick="show('home')">←</button>
+      <div class="font-bold">設定</div>
+    </div>
+
+    <div class="screen-body p-4 space-y-5">
+      <div>
+        <div class="text-xs font-bold text-slate-400 mb-2">🔔 通知</div>
+        <div class="bg-slate-800 rounded-xl divide-y divide-slate-700">
+          <label class="flex justify-between items-center px-4 py-3 cursor-pointer">
+            配信開始通知
+            <input type="checkbox" checked class="w-10 h-6 accent-yellow-400">
+          </label>
+          <label class="flex justify-between items-center px-4 py-3 cursor-pointer">
+            被攻撃通知
+            <input type="checkbox" checked class="w-10 h-6 accent-yellow-400">
+          </label>
+          <label class="flex justify-between items-center px-4 py-3 cursor-pointer">
+            遠征完了通知
+            <input type="checkbox" checked class="w-10 h-6 accent-yellow-400">
+          </label>
+          <label class="flex justify-between items-center px-4 py-3 cursor-pointer">
+            宝箱受け取り
+            <input type="checkbox" checked class="w-10 h-6 accent-yellow-400">
+          </label>
+        </div>
+      </div>
+
+      <div>
+        <div class="text-xs font-bold text-slate-400 mb-2">🔊 サウンド</div>
+        <div class="bg-slate-800 rounded-xl divide-y divide-slate-700">
+          <div class="px-4 py-3">
+            <div class="text-sm mb-1">BGM音量</div>
+            <input type="range" value="60" class="w-full accent-yellow-400">
+          </div>
+          <div class="px-4 py-3">
+            <div class="text-sm mb-1">SE音量</div>
+            <input type="range" value="80" class="w-full accent-yellow-400">
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="text-xs font-bold text-slate-400 mb-2">🎮 アカウント</div>
+        <div class="bg-slate-800 rounded-xl divide-y divide-slate-700">
+          <div class="px-4 py-3 flex justify-between">プロフィール編集 <span>›</span></div>
+          <div class="px-4 py-3 flex justify-between">ログアウト <span>›</span></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="text-xs font-bold text-slate-400 mb-2">📄 その他</div>
+        <div class="bg-slate-800 rounded-xl divide-y divide-slate-700">
+          <div class="px-4 py-3 flex justify-between">利用規約 <span>›</span></div>
+          <div class="px-4 py-3 flex justify-between">プライバシーポリシー <span>›</span></div>
+          <div class="px-4 py-3 flex justify-between text-slate-500">バージョン <span>v0.1.0</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-bar">
+      <button onclick="show('home')"><span class="icon">🏠</span>ホーム</button>
+      <button onclick="show('deck')"><span class="icon">⚔</span>編成</button>
+      <button onclick="show('shop')"><span class="icon">🛒</span>ショップ</button>
+      <button class="active"><span class="icon">⚙</span>設定</button>
+    </div>
+  </div>
+
+  <!-- ▼ 宝箱モーダル ▼ -->
+  <div id="treasure-modal" class="modal">
+    <div class="modal-content">
+      <div id="treasure-step-1" onclick="openTreasureStep2()" class="cursor-pointer">
+        <div class="text-yellow-300 text-sm mb-3">✨ 12時間が経過した！</div>
+        <div class="treasure-box">🎁</div>
+        <div class="mt-3 inline-block px-5 py-2 bg-yellow-400 text-black text-sm font-bold rounded-full shadow-lg">
+          タップして開ける
+        </div>
+      </div>
+      <div id="treasure-step-2" style="display:none;">
+        <div class="text-yellow-300 font-bold text-lg mb-4">🎉 獲得カード</div>
+        <div class="flex justify-around mb-4" id="treasure-result"></div>
+        <div class="text-sm text-yellow-200 mb-4">⬆ 修理マン Lv5 にアップ！</div>
+        <button onclick="closeTreasure()" class="w-full py-2 bg-yellow-400 text-black font-bold rounded-lg">OK</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ────── データ ──────
+const CARDS = {
+  repair:   { name: '修理マン',     emoji: '🔧', cost: 4, color: '#ffa040' },
+  wolf:     { name: 'ウルフマン',   emoji: '🐺', cost: 5, color: '#a04030' },
+  tornado:  { name: 'トルネードマン', emoji: '🌪', cost: 6, color: '#60a0d0' },
+  swords:   { name: '剣士マン',     emoji: '⚔', cost: 3, color: '#c0c0d0' },
+};
+
+const ALLIES = [
+  { name: 'レイ',   level: 12, back: '🏰', backL: '🌲', backR: '🌲', midL: '⚔', midR: '🔥', hero: '🧝', live: true,  hp: 70, hpMax: 100, status: 'live' },
+  { name: 'ノブ',   level: 18, back: '🏛', backL: '🪦', backR: '🌲', midL: '🪖', midR: '🛡', hero: '🧙', live: true,  hp: 90, hpMax: 100, status: 'live' },
+  { name: 'ジン',   level: 8,  back: '⚓', backL: '🌊', backR: '🌊', midL: '🏗', midR: '🪵', hero: '🧑‍🌾', live: false, hp: 0,  hpMax: 0,   status: 'safe' },
+  { name: 'サト',   level: 15, back: '🏰', backL: '💥', backR: '🔥', midL: '⚔', midR: '🪖', hero: '🧝‍♀', live: false, hp: 30, hpMax: 100, status: 'attacked' },
+  { name: 'ケン',   level: 10, back: '🛖', backL: '🌲', backR: '🪵', midL: '🍖', midR: '🪵', hero: '🧑‍🍳', live: true,  hp: 55, hpMax: 100, status: 'live' },
+  { name: 'ハル',   level: 14, back: '🏛', backL: '🔥', backR: '🌲', midL: '🛡', midR: '🪖', hero: '🧚', live: false, hp: 0,  hpMax: 0,   status: 'safe' },
+];
+
+const ENEMIES_ICE = [
+  { name: 'ノブナガ', level: 18, back: '🏰', backL: '❄', backR: '🌲', midL: '⚔', midR: '🛡', hero: '🤴', defended: true,  power: 4 },
+  { name: 'ヨシツネ', level: 15, back: '🏛', backL: '🧊', backR: '❄', midL: '🪖', midR: '🪖', hero: '🧝', defended: false, power: 3 },
+  { name: 'ベンケイ', level: 20, back: '🏔', backL: '⚔', backR: '🌲', midL: '🛡', midR: '⚔', hero: '🧙', defended: true,  power: 5 },
+  { name: 'サナダ',   level: 12, back: '⛵', backL: '🧊', backR: '🌊', midL: '🪖', midR: '🪵', hero: '🧑‍✈', defended: false, power: 2 },
+];
+const ENEMIES_EARTH = [
+  { name: 'タケダ',   level: 16, back: '🏰', backL: '🌲', backR: '🌲', midL: '🛡', midR: '🪖', hero: '🤴', defended: true,  power: 4 },
+  { name: 'ウエスギ', level: 13, back: '🏛', backL: '🌳', backR: '🌳', midL: '🪖', midR: '🪖', hero: '🧙', defended: false, power: 3 },
+];
+
+// 編成（4枚固定モック）
+let DECK = ['repair','wolf','tornado','swords'];
+const OWNED = [
+  { id: 'repair', level: 5, stock: 3 },
+  { id: 'wolf',   level: 2, stock: 1 },
+  { id: 'tornado',level: 3, stock: 8 },
+  { id: 'swords', level: 1, stock: 2 },
+];
+
+// 視聴中の状態
+let elixir = 4;
+const ELIXIR_MAX = 10;
+let selectedCard = null;
+let elixirTimer = null;
+
+// ────── 画面切替 ──────
+function show(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + name).classList.add('active');
+
+  if (name === 'watch') startWatch();
+  else stopWatch();
+
+  if (name === 'home') renderHome();
+  if (name === 'deck') renderDeck();
+  if (name === 'expedition') renderEnemies('ice');
+}
+
+// ────── ホーム ──────
+function renderHome() {
+  const grid = document.getElementById('ally-grid');
+  grid.innerHTML = ALLIES.map((a, i) => {
+    const stateClass = a.live ? 'live-card' : (a.status === 'attacked' ? 'attacked-card' : '');
+    return `
+    <div class="avatar-card fire ${stateClass}" onclick="visit(${i})">
+      <div class="scene">
+        <div class="iso-floor"></div>
+        <div class="iso-obj o-back">${a.back}</div>
+        <div class="iso-obj o-back-left">${a.backL}</div>
+        <div class="iso-obj o-back-right">${a.backR}</div>
+        <div class="iso-obj o-mid-left">${a.midL}</div>
+        <div class="iso-obj o-mid-right">${a.midR}</div>
+        <div class="o-hero">${a.hero}</div>
+      </div>
+      <div class="info">
+        <div class="name">${a.name} <span class="text-slate-400 text-[9px]">Lv${a.level}</span></div>
+        ${a.live
+          ? `<div class="live">🔴 LIVE</div><div class="text-[9px]">HP ${a.hp}/${a.hpMax}</div>`
+          : a.status === 'attacked'
+          ? `<div class="danger">⚠ 被攻撃中</div><div class="text-[9px]">HP ${a.hp}/${a.hpMax}</div>`
+          : `<div class="off">💤 OFF</div><div class="text-[9px] text-slate-500">資源安定</div>`}
+      </div>
+    </div>
+  `}).join('');
+}
+
+function visit(i) {
+  const a = ALLIES[i];
+  document.getElementById('watch-streamer').textContent = `${a.name} (火の国) Day3`;
+  // LIVE / OFFLINE で背景＆モードラベル切替
+  const isLive = a.live;
+  document.getElementById('watch-bg-live').style.display    = isLive ? '' : 'none';
+  document.getElementById('watch-bg-offline').style.display = isLive ? 'none' : '';
+  const modeBadge = document.getElementById('watch-mode');
+  if (isLive) {
+    modeBadge.textContent = '📡 LIVE';
+    modeBadge.className = 'text-[9px] px-1.5 py-0.5 rounded bg-red-600/80';
+  } else {
+    modeBadge.textContent = '🛰 俯瞰';
+    modeBadge.className = 'text-[9px] px-1.5 py-0.5 rounded bg-blue-600/80';
+  }
+  // ジオラマの建物・キャラを各プレイヤー固有に差し替え
+  document.getElementById('iso-back').textContent       = a.back;
+  document.getElementById('iso-back-left').textContent  = a.backL;
+  document.getElementById('iso-back-right').textContent = a.backR;
+  document.getElementById('iso-mid-left').textContent   = a.midL;
+  document.getElementById('iso-mid-right').textContent  = a.midR;
+  document.getElementById('iso-hero').textContent       = a.hero;
+  show('watch');
+}
+
+// ────── 視聴中 ──────
+function renderHand() {
+  const hand = document.getElementById('hand');
+  hand.innerHTML = DECK.map(id => {
+    const c = CARDS[id];
+    const disabled = elixir < c.cost;
+    return `
+      <div class="card ${disabled ? 'disabled' : ''} ${selectedCard === id ? 'selected' : ''}"
+           onclick="selectCard('${id}')">
+        <div class="cost">${c.cost}</div>
+        <div class="emoji">${c.emoji}</div>
+        <div class="name">${c.name}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderElixir() {
+  document.getElementById('elixir-count').textContent = elixir;
+  const cells = document.getElementById('elixir-cells');
+  cells.innerHTML = '';
+  for (let i = 0; i < ELIXIR_MAX; i++) {
+    const d = document.createElement('div');
+    d.className = 'elixir-cell' + (i < elixir ? ' filled' : '');
+    cells.appendChild(d);
+  }
+}
+
+function selectCard(id) {
+  const c = CARDS[id];
+  if (elixir < c.cost) return;
+  selectedCard = id;
+  renderHand();
+  const tm = document.getElementById('target-mode');
+  tm.style.display = 'flex';
+  document.getElementById('target-prompt').textContent = `${c.name}を召喚 - 場所をタップ`;
+  // ゴースト生成
+  let ghost = document.getElementById('summon-ghost');
+  if (!ghost) {
+    ghost = document.createElement('div');
+    ghost.id = 'summon-ghost';
+    ghost.className = 'summon-ghost';
+    ghost.innerHTML = `<div class="ghost-emoji">${c.emoji}</div><div class="ghost-ring"></div>`;
+    tm.appendChild(ghost);
+  } else {
+    ghost.querySelector('.ghost-emoji').textContent = c.emoji;
+  }
+  // 初期位置（中央）
+  const rect = tm.getBoundingClientRect();
+  ghost.style.left = (rect.width / 2) + 'px';
+  ghost.style.top  = (rect.height * 0.6) + 'px';
+  ghost.style.display = '';
+}
+
+function cancelTarget() {
+  selectedCard = null;
+  document.getElementById('target-mode').style.display = 'none';
+  const ghost = document.getElementById('summon-ghost');
+  if (ghost) ghost.style.display = 'none';
+  renderHand();
+}
+
+// ゴースト追従（マウス／タッチ両対応）
+function moveGhost(clientX, clientY) {
+  const ghost = document.getElementById('summon-ghost');
+  if (!ghost) return;
+  const rect = document.getElementById('target-mode').getBoundingClientRect();
+  ghost.style.left = (clientX - rect.left) + 'px';
+  ghost.style.top  = (clientY - rect.top)  + 'px';
+}
+document.getElementById('target-mode').addEventListener('mousemove', (e) => {
+  if (!selectedCard) return;
+  moveGhost(e.clientX, e.clientY);
+});
+document.getElementById('target-mode').addEventListener('touchmove', (e) => {
+  if (!selectedCard) return;
+  const t = e.touches[0];
+  if (t) moveGhost(t.clientX, t.clientY);
+}, { passive: true });
+
+document.getElementById('target-mode').addEventListener('click', (e) => {
+  if (e.target.classList.contains('target-cancel')) return;
+  if (!selectedCard) return;
+  const c = CARDS[selectedCard];
+  if (elixir < c.cost) return;
+
+  // タップ位置に召喚エフェクト
+  const rect = document.getElementById('target-mode').getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  const eff = document.createElement('div');
+  eff.className = 'summon-effect';
+  eff.textContent = c.emoji;
+  eff.style.left = (x - 25) + 'px';
+  eff.style.top = (y - 25) + 'px';
+  document.getElementById('target-mode').appendChild(eff);
+  setTimeout(() => eff.remove(), 2500);
+
+  elixir -= c.cost;
+  selectedCard = null;
+  const ghost = document.getElementById('summon-ghost');
+  if (ghost) ghost.style.display = 'none';
+  document.getElementById('target-mode').style.display = 'none';
+  renderHand();
+  renderElixir();
+});
+
+function startWatch() {
+  renderHand();
+  renderElixir();
+  if (elixirTimer) clearInterval(elixirTimer);
+  elixirTimer = setInterval(() => {
+    if (elixir < ELIXIR_MAX) {
+      elixir++;
+      renderHand();
+      renderElixir();
+    }
+  }, 1500);
+}
+function stopWatch() {
+  if (elixirTimer) clearInterval(elixirTimer);
+  elixirTimer = null;
+}
+
+// ────── 編成 ──────
+function renderDeck() {
+  const dc = document.getElementById('deck-cards');
+  dc.innerHTML = DECK.map(id => {
+    const c = CARDS[id];
+    return `
+      <div class="card" onclick="alert('${c.name} を入れ替える機能はモック簡略化')">
+        <div class="cost">${c.cost}</div>
+        <div class="emoji">${c.emoji}</div>
+        <div class="name">${c.name}</div>
+      </div>
+    `;
+  }).join('');
+
+  const oc = document.getElementById('owned-cards');
+  oc.innerHTML = OWNED.map(o => {
+    const c = CARDS[o.id];
+    return `
+      <div class="card" style="height:auto;padding:8px;width:100%;">
+        <div class="cost">${c.cost}</div>
+        <div class="emoji">${c.emoji}</div>
+        <div class="name">${c.name}</div>
+        <div class="text-[9px] text-slate-400 mt-1">Lv${o.level} / ×${o.stock}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ────── 遠征 ──────
+function filterFaction(btn, fac) {
+  btn.parentElement.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderEnemies(fac);
+}
+
+function renderEnemies(fac) {
+  const list = fac === 'ice' ? ENEMIES_ICE : ENEMIES_EARTH;
+  const klass = fac === 'ice' ? 'ice' : 'earth';
+  document.getElementById('enemy-grid').innerHTML = list.map(e => `
+    <div class="avatar-card ${klass}" onclick="confirmExpedition('${e.name}')">
+      <div class="scene">
+        <div class="iso-floor"></div>
+        <div class="iso-obj o-back">${e.back}</div>
+        <div class="iso-obj o-back-left">${e.backL}</div>
+        <div class="iso-obj o-back-right">${e.backR}</div>
+        <div class="iso-obj o-mid-left">${e.midL}</div>
+        <div class="iso-obj o-mid-right">${e.midR}</div>
+        <div class="o-hero">${e.hero}</div>
+      </div>
+      <div class="info">
+        <div class="name">${e.name} <span class="text-slate-400 text-[9px]">Lv${e.level}</span></div>
+        <div class="${e.defended ? 'text-blue-300' : 'text-red-300'} text-[10px]">
+          ${e.defended ? '🛡 防衛中' : '⚠ 無防備🎯'}
+        </div>
+        <div class="text-yellow-300 text-[10px]">戦力 ${'⭐'.repeat(e.power)}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function confirmExpedition(name) {
+  if (confirm(`${name} へ遠征しますか？`)) {
+    alert('遠征を開始しました');
+  }
+}
+
+// ────── ショップ ──────
+function shopTab(btn, tab) {
+  btn.parentElement.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('shop-pack').style.display = tab === 'pack' ? '' : 'none';
+  document.getElementById('shop-box').style.display = tab === 'box' ? '' : 'none';
+}
+
+// ────── 宝箱 ──────
+function openTreasure() {
+  document.getElementById('treasure-modal').classList.add('active');
+  document.getElementById('treasure-step-1').style.display = '';
+  document.getElementById('treasure-step-2').style.display = 'none';
+}
+function openTreasureStep2() {
+  document.getElementById('treasure-step-1').style.display = 'none';
+  document.getElementById('treasure-step-2').style.display = '';
+  const result = [
+    { id: 'repair',  count: 3 },
+    { id: 'wolf',    count: 1 },
+    { id: 'tornado', count: 2 },
+  ];
+  document.getElementById('treasure-result').innerHTML = result.map(r => {
+    const c = CARDS[r.id];
+    return `
+      <div class="card" style="width:60px;height:80px;">
+        <div class="cost">${c.cost}</div>
+        <div class="emoji" style="font-size:28px;">${c.emoji}</div>
+        <div class="text-[9px] text-yellow-300">×${r.count}</div>
+      </div>
+    `;
+  }).join('');
+}
+function closeTreasure() {
+  document.getElementById('treasure-modal').classList.remove('active');
+}
+
+// ────── 国選択 ──────
+let myFaction = null; // 'fire' | 'ice' | 'earth'
+const FACTION_LABEL = {
+  fire:  { emoji: '🔥', name: '火の国 インフェリア' },
+  ice:   { emoji: '🧊', name: '氷の国 フロスティア' },
+  earth: { emoji: '⛰',  name: '土の国 ガイアス' },
+};
+
+function selectFaction(f, el) {
+  myFaction = f;
+  document.querySelectorAll('.faction-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  document.getElementById('faction-confirm').disabled = false;
+}
+function confirmFaction() {
+  if (!myFaction) return;
+  // ヘッダーの所属国を更新
+  const lbl = FACTION_LABEL[myFaction];
+  document.getElementById('home-faction-label').innerHTML = `${lbl.emoji} ${lbl.name} / Lv.12`;
+  // 初回宝箱を出してからホームへ
+  show('home');
+  setTimeout(() => openTreasure(), 600);
+}
+
+// ────── 初期化 ──────
+// 初回 = 所属国未選択 → 国選択画面からスタート
+show('faction-select');
+</script>
+
+</body>
+</html>
